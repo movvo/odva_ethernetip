@@ -102,7 +102,7 @@ public:
   /**
    * Not implemented. Never expect to have to receive this type of message.
    */
-  virtual Reader& deserialize(Reader& reader, size_t length)
+  virtual Reader& deserialize(Reader& /*reader*/, size_t /*length*/)
   {
     throw std::logic_error("Not implemented");
   }
@@ -110,7 +110,7 @@ public:
   /**
    * Not implemented. Never expect to have to receive this type of message.
    */
-  virtual Reader& deserialize(Reader& reader)
+  virtual Reader& deserialize(Reader& /*reader*/)
   {
     throw std::logic_error("Not implemented");
   }

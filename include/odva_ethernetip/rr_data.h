@@ -85,7 +85,7 @@ public:
   /**
    * Extra length information is not relevant in this context. Same as deserialize(reader)
    */
-  virtual Reader& deserialize(Reader& reader, size_t length)
+  virtual Reader& deserialize(Reader& reader, size_t /*length*/)
   {
     deserialize(reader);
     return reader;
@@ -113,7 +113,7 @@ protected:
    * Deserialize the data for this specific implementation
    * @param item the CPF item that was deserialized, copy data from that
    */
-  virtual void setData(CPFItem& item) { }
+  virtual void setData(CPFItem& /*item*/) { }
 };
 
 } // namespace eip

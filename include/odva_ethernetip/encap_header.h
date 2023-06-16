@@ -86,7 +86,7 @@ public:
    * @return the reader again
    * @throw std::length_error if the buffer is overrun while deserializing
    */
-  virtual Reader& deserialize(Reader& reader, size_t length)
+  virtual Reader& deserialize(Reader& reader, size_t /*length*/)
   {
     if (getLength() != length)
     {

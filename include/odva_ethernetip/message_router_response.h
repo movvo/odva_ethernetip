@@ -87,7 +87,7 @@ public:
    * @return the writer again
    * @throw std::length_error if the buffer is too small for the header data
    */
-  virtual Writer& serialize(Writer& writer) const
+  virtual Writer& serialize(Writer& /*writer*/) const
   {
     throw std::logic_error("Not implemented");
   }
@@ -95,12 +95,12 @@ public:
   /**
    * Deserialize response data from the given reader and length
    */
-  virtual Reader& deserialize(Reader& reader, size_t length);
+  virtual Reader& deserialize(Reader& reader, size_t /*length*/);
 
   /**
    * Not implemented. Never expect to have to receive this type of message.
    */
-  virtual Reader& deserialize(Reader& reader)
+  virtual Reader& deserialize(Reader& /*reader*/)
   {
     throw std::logic_error("Must have size to deserialize");
   }

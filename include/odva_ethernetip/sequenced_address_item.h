@@ -77,7 +77,7 @@ public:
   /**
    * Extra length information is not relevant in this context. Same as deserialize(reader)
    */
-  virtual Reader& deserialize(Reader& reader, size_t length)
+  virtual Reader& deserialize(Reader& reader, size_t /*length*/)
   {
     return deserialize(reader);
   }

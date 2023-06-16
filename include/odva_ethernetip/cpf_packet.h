@@ -86,7 +86,7 @@ public:
    * Length data isn't meaningful here. Instead just calls the deserialize
    * without the added information.
    */
-  virtual Reader& deserialize(Reader& reader, size_t length)
+  virtual Reader& deserialize(Reader& reader, size_t /*length*/)
   {
     deserialize(reader);
     return reader;

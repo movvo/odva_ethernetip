@@ -85,7 +85,7 @@ public:
    * @throw std::length_error if the given length is greater than allocated
    *   data buffer
    */
-  virtual Reader& deserialize(Reader& reader, size_t length)
+  virtual Reader& deserialize(Reader& reader, size_t /*length*/)
   {
     deserialize(reader);
     return reader;

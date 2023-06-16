@@ -90,7 +90,7 @@ public:
    * @return the writer again
    * @throw std::length_error if the buffer is too small for the header data
    */
-  virtual Writer& serialize(Writer& writer) const
+  virtual Writer& serialize(Writer& /*writer*/) const
   {
     throw std::logic_error("Not implemented");
   }
@@ -98,7 +98,7 @@ public:
   /**
    * Don't need extra length info, as the message data defines its length
    */
-  virtual Reader& deserialize(Reader& reader, size_t length)
+  virtual Reader& deserialize(Reader& reader, size_t /*length*/)
   {
     return deserialize(reader);
   }
