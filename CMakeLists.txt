@@ -13,7 +13,7 @@ include_directories(
 )
 
 ## Declare a cpp library for just Ethernet/IP generic stuff
-add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME} SHARED
   src/connection.cpp
   src/copy_serializable.cpp
   src/cpf_item.cpp
@@ -34,27 +34,20 @@ target_link_libraries(${PROJECT_NAME}
 )
 
 ## Mark executables and libraries for installation
-
-# target_include_directories(${PROJECT_NAME}
-#   PUBLIC
-#     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-#     $<INSTALL_INTERFACE:include>)
-
-# ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
-
-# install(
-#   TARGETS ${PROJECT_NAME}
-#   EXPORT export_${PROJECT_NAME}
-#   LIBRARY DESTINATION lib
-#   ARCHIVE DESTINATION lib
-#   RUNTIME DESTINATION bin
-#   INCLUDES DESTINATION include
-# )
-
-install(
-  DIRECTORY include
-  DESTINATION include
+install(DIRECTORY include/
+  DESTINATION include/
 )
+
+install(TARGETS
+  ${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+ament_export_include_directories(include)
+ament_export_libraries(${PROJECT_NAME})
+ament_export_dependencies(${dependencies})
 
 ament_package()
 
