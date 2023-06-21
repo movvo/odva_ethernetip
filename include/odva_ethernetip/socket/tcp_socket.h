@@ -46,7 +46,8 @@ class TCPSocket : public Socket
 {
 public:
 
-  TCPSocket(io_service& io_serv) : socket_(io_serv) { }
+  TCPSocket(io_service& io_serv, unsigned short local_port, std::string local_ip) 
+    : socket_(io_serv), local_endpoint_(boost::asio::ip::address::from_string(local_ip), local_port) { }
 
   /**
    * Open the socket to connect to the given hostname and port
@@ -55,10 +56,10 @@ public:
    */
   virtual void open(string hostname, string port)
   {
-    tcp::resolver resolver(GET_IO_SERVICE(&socket_));
-    tcp::resolver::query query(hostname, port);
-    tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
-    connect(socket_, endpoint_iterator);
+    tcp::endpoint remote_endpoint(boost::asio::ip::address::from_string(hostname), std::stoi(port));
+    socket_.open(tcp::v4());
+    socket_.bind(local_endpoint_);
+    socket_.connect(remote_endpoint);
   }
 
   /**
@@ -92,6 +93,7 @@ public:
 
 private:
   tcp::socket socket_;
+  tcp::endpoint local_endpoint_;
 };
 
 } // namespace socket
