@@ -5,6 +5,11 @@ find_package(ament_cmake REQUIRED)
 
 find_package(console_bridge REQUIRED)
 find_package(Boost 1.47 REQUIRED COMPONENTS system)
+find_package(rclcpp)
+
+set(dependencies
+  rclcpp
+)
 
 include_directories(
   include
@@ -27,6 +32,9 @@ add_library(${PROJECT_NAME} SHARED
   src/rr_data.cpp
   src/session.cpp
 )
+
+ament_target_dependencies(${PROJECT_NAME} 
+                          ${dependencies})
 
 target_link_libraries(${PROJECT_NAME}
   ${Boost_LIBRARIES}

@@ -26,6 +26,8 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
 #ifndef ODVA_ETHERNETIP_SESSION_H
 #define ODVA_ETHERNETIP_SESSION_H
 
+#include "rclcpp/rclcpp.hpp"
+
 #include <string>
 #include <gtest/gtest_prod.h>
 #include <boost/shared_ptr.hpp>
@@ -69,10 +71,11 @@ public:
    * @param vendor_id My vendor ID number to be used if different than the default
    * @param serial_num My serial number to use when setting up connections
    */
-  Session(shared_ptr<Socket> socket, shared_ptr<Socket> io_socket,
+  Session(shared_ptr<Socket> socket, shared_ptr<Socket> io_socket,  std::shared_ptr<rclcpp::Node> &nh,
     EIP_UINT vendor_id = DEFAULT_VENDOR_ID, EIP_UDINT serial_num = DEFAULT_SERIAL_NUM);
 
   virtual ~Session();
+  std::shared_ptr<rclcpp::Node> nh_;
 
   /**
    * Open the session by opening the port and requesting a session.
@@ -86,6 +89,7 @@ public:
    * Close the session by unregistering the session and then closing the port
    */
   void close();
+  void closeIO();
 
   /**
    * Get the ID number assigned to this session by the target
@@ -114,7 +118,7 @@ public:
    * @return Attribute value from target
    */
   template <typename T>
-  T getSingleAttribute(EIP_USINT class_id, EIP_USINT instance_id, EIP_USINT attribute_id, T /*v*/)
+  T getSingleAttribute(EIP_USINT class_id, EIP_USINT instance_id, EIP_USINT attribute_id, T v)
   {
     SerializablePrimitive<T> data;
     getSingleAttributeSerializable(class_id, instance_id, attribute_id, data);

@@ -23,12 +23,12 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCL
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <iostream>
 #include <boost/bind/bind.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_int_distribution.hpp>
-#include <console_bridge/console.h>
 
 #include "odva_ethernetip/serialization/buffer_reader.h"
 #include "odva_ethernetip/serialization/buffer_writer.h"
@@ -41,6 +41,7 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
 
 using boost::shared_ptr;
 using boost::make_shared;
+using namespace boost::placeholders;
 using std::endl;
 
 namespace eip {
@@ -48,7 +49,7 @@ namespace eip {
 using serialization::BufferReader;
 using serialization::BufferWriter;
 
-Session::Session(shared_ptr<Socket> socket, shared_ptr<Socket> io_socket,
+Session::Session(shared_ptr<Socket> socket, shared_ptr<Socket> io_socket,   std::shared_ptr<rclcpp::Node> &nh,
     EIP_UINT vendor_id, EIP_UDINT serial_num)
     : socket_(socket), io_socket_(io_socket), session_id_(0),
       my_vendor_id_(vendor_id), my_serial_num_(serial_num)
@@ -59,7 +60,8 @@ Session::Session(shared_ptr<Socket> socket, shared_ptr<Socket> io_socket,
   boost::random::uniform_int_distribution<> dist(0, 0xFFFF);
   next_connection_id_ = gen();
   next_connection_sn_ = dist(gen);
-  CONSOLE_BRIDGE_logInform("Generated starting connection ID %zu and SN %zu", next_connection_id_, next_connection_sn_);
+  nh_ = nh;
+  RCLCPP_INFO(nh_->get_logger(),"Generated starting connection ID %u and SN %u", next_connection_id_, next_connection_sn_);
 }
 
 Session::~Session()
@@ -79,12 +81,10 @@ Session::~Session()
 
 void Session::open(string hostname, string port, string io_port)
 {
-  CONSOLE_BRIDGE_logInform("Resolving hostname and connecting socket");
   socket_->open(hostname, port);
   io_socket_->open(hostname, io_port);
-
   // create the registration message
-  CONSOLE_BRIDGE_logInform("Creating and sending the registration message");
+  RCLCPP_INFO(nh_->get_logger(),"Creating and sending the registration message");
   shared_ptr<RegisterSessionData> reg_data = make_shared<RegisterSessionData>();
   EncapPacket reg_msg(EIP_CMD_REGISTER_SESSION, 0, reg_data);
 
@@ -98,20 +98,20 @@ void Session::open(string hostname, string port, string io_port)
   {
     socket_->close();
     io_socket_->close();
-    CONSOLE_BRIDGE_logError("Could not parse response when registering session: %s", ex.what());
+    RCLCPP_ERROR(nh_->get_logger(),"Could not parse response when registering session: %s", ex.what());
     throw std::runtime_error("Invalid response received registering session");
   }
   catch (std::logic_error ex)
   {
     socket_->close();
     io_socket_->close();
-    CONSOLE_BRIDGE_logError("Error in registration response: %s", ex.what());
+    RCLCPP_ERROR(nh_->get_logger(),"Error in registration response: %s", ex.what());
     throw std::runtime_error("Error in registration response");
   }
 
   if (response.getHeader().length != reg_data->getLength())
   {
-    CONSOLE_BRIDGE_logWarn("Registration message received with wrong size. Expected %zu bytes, received %u",
+    RCLCPP_WARN(nh_->get_logger(),"Registration message received with wrong size. Expected %zu bytes, received %u",
                            reg_data->getLength(), response.getHeader().length);
   }
 
@@ -123,16 +123,16 @@ void Session::open(string hostname, string port, string io_port)
   }
   catch (std::length_error ex)
   {
-    CONSOLE_BRIDGE_logWarn("Registration message too short, ignoring");
+    RCLCPP_WARN(nh_->get_logger(),"Registration message too short, ignoring");
   }
   catch (std::logic_error ex)
   {
-    CONSOLE_BRIDGE_logWarn("Could not parse registration response: %s", ex.what());
+    RCLCPP_WARN(nh_->get_logger(),"Could not parse registration response: %s", ex.what());
   }
 
   if (response_valid && reg_data->protocol_version != EIP_PROTOCOL_VERSION)
   {
-    CONSOLE_BRIDGE_logError("Error: Wrong Ethernet Industrial Protocol Version. Expected %u got %u",
+    RCLCPP_ERROR(nh_->get_logger(),"Error: Wrong Ethernet Industrial Protocol Version. Expected %u got %u",
                             EIP_PROTOCOL_VERSION, reg_data->protocol_version);
     socket_->close();
     io_socket_->close();
@@ -140,45 +140,47 @@ void Session::open(string hostname, string port, string io_port)
   }
   if (response_valid && reg_data->options != 0)
   {
-    CONSOLE_BRIDGE_logWarn("Registration message included non-zero options flags: %u", reg_data->options);
+    RCLCPP_WARN(nh_->get_logger(),"Registration message included non-zero options flags: %u", reg_data->options);
   }
 
   session_id_ = response.getHeader().session_handle;
-  CONSOLE_BRIDGE_logInform("Successfully opened session ID %zu", session_id_);
+  RCLCPP_INFO(nh_->get_logger(),"Successfully opened session ID %u", session_id_);
 }
 
 void Session::close()
 {
   // TODO: should close all connections and the IO port
-  CONSOLE_BRIDGE_logInform("Closing session");
+  RCLCPP_INFO(nh_->get_logger(),"Closing session");
 
   // create the unregister session message
   EncapPacket reg_msg(EIP_CMD_UNREGISTER_SESSION, session_id_);
   socket_->send(reg_msg);
 
-  CONSOLE_BRIDGE_logInform("Session closed");
+  RCLCPP_INFO(nh_->get_logger(),"Session closed");
 
   socket_->close();
+}
+
+void Session::closeIO()
+{
   io_socket_->close();
   session_id_ = 0;
 }
 
 EncapPacket Session::sendCommand(EncapPacket& req)
 {
-  CONSOLE_BRIDGE_logDebug("Sending Command");
+  RCLCPP_DEBUG(nh_->get_logger(),"Sending Command");
   socket_->send(req);
-
-  CONSOLE_BRIDGE_logDebug("Waiting for response");
+  RCLCPP_DEBUG(nh_->get_logger(),"Waiting for response");
   size_t n = socket_->receive(buffer(recv_buffer_));
-  CONSOLE_BRIDGE_logDebug("Received response of %zu bytes", n);
+  RCLCPP_DEBUG(nh_->get_logger(),"Received response of %zu bytes", n);
 
   BufferReader reader(buffer(recv_buffer_, n));
   EncapPacket result;
   result.deserialize(reader);
-
   if (reader.getByteCount() != n)
   {
-    CONSOLE_BRIDGE_logWarn("Packet received with %zu bytes, but only %zu bytes used", n, reader.getByteCount());
+    RCLCPP_WARN(nh_->get_logger(),"Packet received with %zu bytes, but only %zu bytes used", n, reader.getByteCount());
   }
 
   check_packet(result, req.getHeader().command);
@@ -190,33 +192,33 @@ void Session::check_packet(EncapPacket& pkt, EIP_UINT exp_cmd)
   // verify that all fields are correct
   if (pkt.getHeader().command != exp_cmd)
   {
-    CONSOLE_BRIDGE_logError("Reply received with wrong command. Expected %u received %u", exp_cmd,
+    RCLCPP_ERROR(nh_->get_logger(),"Reply received with wrong command. Expected %u received %u", exp_cmd,
                             pkt.getHeader().command);
     throw std::logic_error("Reply received with wrong command");
   }
   if (session_id_ == 0 && pkt.getHeader().session_handle == 0)
   {
-    CONSOLE_BRIDGE_logError("Zero session handle received on registration: %zu", pkt.getHeader().session_handle);
+    RCLCPP_ERROR(nh_->get_logger(),"Zero session handle received on registration: %u", pkt.getHeader().session_handle);
     throw std::logic_error("Zero session handle received on registration");
   }
   if (session_id_ != 0 && pkt.getHeader().session_handle != session_id_)
   {
-    CONSOLE_BRIDGE_logError("Reply received with wrong session ID. Expected %zu, received %zu", session_id_,
+    RCLCPP_ERROR(nh_->get_logger(),"Reply received with wrong session ID. Expected %u, received %u", session_id_,
                             pkt.getHeader().session_handle);
     throw std::logic_error("Wrong session ID received for command");
   }
   if (pkt.getHeader().status != 0)
   {
-    CONSOLE_BRIDGE_logWarn("Non-zero status received: %zu", pkt.getHeader().status);
+    RCLCPP_WARN(nh_->get_logger(),"Non-zero status received: %u", pkt.getHeader().status);
   }
   if (pkt.getHeader().context[0] != 0 || pkt.getHeader().context[1] != 0)
   {
-    CONSOLE_BRIDGE_logWarn("Non-zero sender context received: %zu/%zu", pkt.getHeader().context[0],
+    RCLCPP_WARN(nh_->get_logger(),"Non-zero sender context received: %u/%u", pkt.getHeader().context[0],
                            pkt.getHeader().context[1]);
   }
   if (pkt.getHeader().options != 0)
   {
-    CONSOLE_BRIDGE_logWarn("Non-zero options received: %zu", pkt.getHeader().options);
+    RCLCPP_WARN(nh_->get_logger(),"Non-zero options received: %u", pkt.getHeader().options);
   }
 }
 
@@ -240,7 +242,7 @@ void Session::setSingleAttributeSerializable(EIP_USINT class_id,
 RRDataResponse Session::sendRRDataCommand(EIP_USINT service, const Path& path,
   shared_ptr<Serializable> data)
 {
-  CONSOLE_BRIDGE_logDebug("Creating RR Data Request");
+  RCLCPP_DEBUG(nh_->get_logger(),"Creating RR Data Request");
   shared_ptr<RRDataRequest> req_data =
     make_shared<RRDataRequest> (service, path, data);
   EncapPacket encap_pkt(EIP_CMD_SEND_RR_DATA, session_id_, req_data);
@@ -253,12 +255,12 @@ RRDataResponse Session::sendRRDataCommand(EIP_USINT service, const Path& path,
   }
   catch (std::length_error ex)
   {
-    CONSOLE_BRIDGE_logError("Response packet to RR command too short: %s", ex.what());
+    RCLCPP_ERROR(nh_->get_logger(),"Response packet to RR command too short: %s", ex.what());
     throw std::runtime_error("Packet response to RR Data Command too short");
   }
   catch (std::logic_error ex)
   {
-    CONSOLE_BRIDGE_logError("Invalid response to RR command: %s", ex.what());
+    RCLCPP_ERROR(nh_->get_logger(),"Invalid response to RR command: %s", ex.what());
     throw std::runtime_error("Invalid packet response to RR Data Command");
   }
 
@@ -269,25 +271,25 @@ RRDataResponse Session::sendRRDataCommand(EIP_USINT service, const Path& path,
   }
   catch (std::length_error ex)
   {
-    CONSOLE_BRIDGE_logError("Response data to RR command too short: %s", ex.what());
+    RCLCPP_ERROR(nh_->get_logger(),"Response data to RR command too short: %s", ex.what());
     throw std::runtime_error("Response data to RR Command too short");
   }
   catch (std::logic_error ex)
   {
-    CONSOLE_BRIDGE_logError("Invalid data to RR command: %s", ex.what());
+    RCLCPP_ERROR(nh_->get_logger(),"Invalid data to RR command: %s", ex.what());
     throw std::runtime_error("Invalid data in response to RR command");
   }
 
   // check that responses are valid
   if (resp_data.getServiceCode() != (service | 0x80))
   {
-    CONSOLE_BRIDGE_logWarn("Wrong service code returned for RR Data command. Expected: %d but received %d",
+    RCLCPP_ERROR(nh_->get_logger(),"Wrong service code returned for RR Data command. Expected: %d but received %d",
                            (int)service, (int)resp_data.getServiceCode());
-    // throw std::runtime_error("Wrong service code returned for RR Data command");
+    throw std::runtime_error("Wrong service code returned for RR Data command");
   }
   if (resp_data.getGeneralStatus())
   {
-    CONSOLE_BRIDGE_logError("RR Data Command failed with status %d", (int)resp_data.getGeneralStatus());
+    RCLCPP_ERROR(nh_->get_logger(),"RR Data Command failed with status %d", (int)resp_data.getGeneralStatus());
     throw std::runtime_error("RR Data Command Failed");
   }
   return resp_data;
@@ -304,17 +306,17 @@ int Session::createConnection(const EIP_CONNECTION_INFO_T& o_to_t,
   conn.t_to_o_connection_id = next_connection_id_++;
 
   shared_ptr<ForwardOpenRequest> req = conn.createForwardOpenRequest();
-  RRDataResponse resp_data = sendRRDataCommand(0x5B, Path(0x06, 1), req);
+  RRDataResponse resp_data = sendRRDataCommand(0x54, Path(0x06, 1), req);
   ForwardOpenSuccess result;
   resp_data.getResponseDataAs(result);
   if (!conn.verifyForwardOpenResult(result))
   {
-    CONSOLE_BRIDGE_logError("Received invalid response to forward open request");
+    RCLCPP_ERROR(nh_->get_logger(),"Received invalid response to forward open request");
     throw std::logic_error("Forward Open Response Invalid");
   }
 
   connections_.push_back(conn);
-  return connections_.size() - 1;
+  return result.o_to_t_connection_id;
 }
 
 void Session::closeConnection(size_t n)
@@ -325,7 +327,7 @@ void Session::closeConnection(size_t n)
   resp_data.getResponseDataAs(result);
   if (!connections_[n].verifyForwardCloseResult(result))
   {
-    CONSOLE_BRIDGE_logError("Received invalid response to forward close request");
+    RCLCPP_ERROR(nh_->get_logger(),"Received invalid response to forward close request");
     throw std::logic_error("Forward Close Response Invalid");
   }
   // remove the connection from the list
@@ -334,9 +336,9 @@ void Session::closeConnection(size_t n)
 
 CPFPacket Session::receiveIOPacket()
 {
-  CONSOLE_BRIDGE_logDebug("Receiving IO packet");
+  RCLCPP_INFO(nh_->get_logger(),"Receiving IO packet");
   size_t n = io_socket_->receive(buffer(recv_buffer_));
-  CONSOLE_BRIDGE_logDebug("Received IO of %zu bytes", n);
+  RCLCPP_INFO(nh_->get_logger(),"Received IO of %zu bytes", n);
 
   BufferReader reader(buffer(recv_buffer_, n));
   CPFPacket result;
@@ -344,7 +346,7 @@ CPFPacket Session::receiveIOPacket()
 
   if (reader.getByteCount() != n)
   {
-    CONSOLE_BRIDGE_logWarn("IO packet received with %zu bytes, but only %zu bytes used", n, reader.getByteCount());
+    RCLCPP_WARN(nh_->get_logger(),"IO packet received with %zu bytes, but only %zu bytes used", n, reader.getByteCount());
   }
 
   return result;
@@ -352,7 +354,7 @@ CPFPacket Session::receiveIOPacket()
 
 void Session::sendIOPacket(CPFPacket& pkt)
 {
-  CONSOLE_BRIDGE_logDebug("Sending CPF Packet on IO Socket");
+  RCLCPP_DEBUG(nh_->get_logger(),"Sending CPF Packet on IO Socket");
   io_socket_->send(pkt);
 }
 
