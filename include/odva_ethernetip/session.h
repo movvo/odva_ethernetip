@@ -118,7 +118,7 @@ public:
    * @return Attribute value from target
    */
   template <typename T>
-  T getSingleAttribute(EIP_USINT class_id, EIP_USINT instance_id, EIP_USINT attribute_id, T v)
+  T getSingleAttribute(EIP_USINT class_id, EIP_USINT instance_id, EIP_USINT attribute_id, [[maybe_unused]] T v)
   {
     SerializablePrimitive<T> data;
     getSingleAttributeSerializable(class_id, instance_id, attribute_id, data);
