@@ -306,7 +306,7 @@ int Session::createConnection(const EIP_CONNECTION_INFO_T& o_to_t,
   conn.t_to_o_connection_id = next_connection_id_++;
 
   shared_ptr<ForwardOpenRequest> req = conn.createForwardOpenRequest();
-  RRDataResponse resp_data = sendRRDataCommand(0x54, Path(0x06, 1), req);
+  RRDataResponse resp_data = sendRRDataCommand(0x5B, Path(0x06, 1), req);
   ForwardOpenSuccess result;
   resp_data.getResponseDataAs(result);
   if (!conn.verifyForwardOpenResult(result))
@@ -316,7 +316,7 @@ int Session::createConnection(const EIP_CONNECTION_INFO_T& o_to_t,
   }
 
   connections_.push_back(conn);
-  return result.o_to_t_connection_id;
+  return connections_.size() - 1;
 }
 
 void Session::closeConnection(size_t n)
@@ -336,9 +336,9 @@ void Session::closeConnection(size_t n)
 
 CPFPacket Session::receiveIOPacket()
 {
-  RCLCPP_INFO(nh_->get_logger(),"Receiving IO packet");
+  RCLCPP_DEBUG(nh_->get_logger(),"Receiving IO packet");
   size_t n = io_socket_->receive(buffer(recv_buffer_));
-  RCLCPP_INFO(nh_->get_logger(),"Received IO of %zu bytes", n);
+  RCLCPP_DEBUG(nh_->get_logger(),"Received IO of %zu bytes", n);
 
   BufferReader reader(buffer(recv_buffer_, n));
   CPFPacket result;
