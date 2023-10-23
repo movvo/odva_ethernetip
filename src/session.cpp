@@ -71,9 +71,10 @@ Session::~Session()
     if (session_id_ != 0)
     {
       close();
+      closeIO();
     }
   }
-  catch (...)
+  catch (std::exception & ex)
   {
     // can't throw exceptions, but can't do anything either
   }

@@ -68,6 +68,7 @@ public:
    */
   virtual inline void close()
   {
+    socket_.release();
     socket_.close();
   }
 
